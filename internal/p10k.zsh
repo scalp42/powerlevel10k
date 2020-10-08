@@ -6056,7 +6056,7 @@ _p9k_dump_instant_prompt() {
     unset __p9k_instant_prompt_active
     exec 0<&$__p9k_fd_0 1>&$__p9k_fd_1 2>&$__p9k_fd_2 {__p9k_fd_0}>&- {__p9k_fd_1}>&- {__p9k_fd_2}>&-
     unset __p9k_fd_0 __p9k_fd_1 __p9k_fd_2
-    typeset -gi __p9k_instant_prompt_erased=1
+    # typeset -gi __p9k_instant_prompt_erased=1
     if (( _z4h_can_save_restore_screen == 1 && __p9k_instant_prompt_sourced >= 35 )); then
       -z4h-restore-screen
       unset _z4h_saved_screen
