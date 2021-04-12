@@ -89,7 +89,7 @@ Note how the effect of every command is instantly reflected by the very next pro
 
 | Command                       | Prompt Indicator | Meaning                                                               |
 |-------------------------------|:----------------:|----------------------------------------------------------------------:|
-| `timew start hack linux`      | `🛡️ hack linux`  | time tracking enabled in [timewarrior](https://timewarrior.net/)      |
+| `timew start hack linux`      | `⌚ hack linux`  | time tracking enabled in [timewarrior](https://timewarrior.net/)      |
 | `touch x y`                   | `?2`             | 2 untracked files in the Git repo                                     |
 | `rm COPYING`                  | `!1`             | 1 unstaged change in the Git repo                                     |
 | `echo 3.7.3 >.python-version` | `🐍 3.7.3`       | the current python version in [pyenv](https://github.com/pyenv/pyenv) |
@@ -183,8 +183,8 @@ Here's the relevant parameter for kubernetes context:
 
 ```zsh
 # Show prompt segment "kubecontext" only when the command you are typing
-# invokes kubectl, helm, kubens, kubectx, oc, istioctl, kogito, k9s or helmfile.
-typeset -g POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND='kubectl|helm|kubens|kubectx|oc|istioctl|kogito|k9s|helmfile'
+# invokes kubectl, helm, kubens, kubectx, oc, istioctl, kogito, k9s, helmfile, fluxctl or stern.
+typeset -g POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND='kubectl|helm|kubens|kubectx|oc|istioctl|kogito|k9s|helmfile|fluxctl|stern'
 ```
 
 To customize when different prompt segments are shown, open `~/.p10k.zsh`, search for
@@ -421,7 +421,7 @@ supported by Powerlevel10k.
 
 ```zsh
 brew install romkatv/powerlevel10k/powerlevel10k
-echo 'source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme' >>~/.zshrc
+echo "source $(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" >>~/.zshrc
 ```
 
 ### Arch Linux
@@ -533,10 +533,10 @@ Download these four ttf files:
 Double-click on each file and click "Install". This will make `MesloLGS NF` font available to all
 applications on your system. Configure your terminal to use this font:
 
-- **iTerm2**: Open *iTerm2 → Preferences → Profiles → Text* and set *Font* to `MesloLGS NF`.
-  Alternatively, type `p10k configure` and answer `Yes` when asked whether to install
-  *Meslo Nerd Font*.
-- **Apple Terminal** Open *Terminal → Preferences → Profiles → Text*, click *Change* under *Font*
+- **iTerm2**: Type `p10k configure` and answer `Yes` when asked whether to install
+  *Meslo Nerd Font*. Alternatively, open *iTerm2 → Preferences → Profiles → Text* and set *Font* to
+  `MesloLGS NF`.
+- **Apple Terminal**: Open *Terminal → Preferences → Profiles → Text*, click *Change* under *Font*
   and select `MesloLGS NF` family.
 - **Hyper**: Open *Hyper → Edit → Preferences* and change the value of `fontFamily` under
   `module.exports.config` to `MesloLGS NF`.
@@ -551,19 +551,25 @@ applications on your system. Configure your terminal to use this font:
   *Custom font* under *Text Appearance* and select `MesloLGS NF Regular`.
 - **Windows Console Host** (the old thing): Click the icon in the top left corner, then
   *Properties → Font* and set *Font* to `MesloLGS NF`.
-- **Windows Terminal** (the new thing): Open *Settings* (`Ctrl+,`), search for `fontFace` and set
+- **Microsoft Terminal** (the new thing): Open *Settings* (`Ctrl+,`), search for `fontFace` and set
   value to `MesloLGS NF` for every profile.
+- **IntelliJ**: Open *Intellij → Edit → Preferences → Editor → Color Scheme → Console Font*.
+  Select *Use console font instead of the default* and set the font name to `MesloLGS NF`.
 - **Termux**: Type `p10k configure` and answer `Yes` when asked whether to install
   *Meslo Nerd Font*.
-- **Blink** Type `config`, go to *Appearance*, tap *Add a new font*, tap *Open Gallery*, select
+- **Blink**: Type `config`, go to *Appearance*, tap *Add a new font*, tap *Open Gallery*, select
   *MesloLGS NF.css*, tap *import* and type `exit` in the home view to reload the font.
 - **Terminus**: Open *Settings → Appearance* and set *Font* to `MesloLGS NF`.
 - **Terminator**: Open *Preferences* using the context menu. Under *Profiles* select the *General*
   tab (should be selected already), uncheck *Use the system fixed width font* (if not already)
   and select `MesloLGS NF Regular`. Exit the Preferences dialog by clicking *Close*.
-- **Guake**: Right Click on an open terminal and open *Preferences*. Under *Appearance* 
-  tab, uncheck *Use the system fixed width font* (if not already) and select `MesloLGS NF Regular`. 
-  Exit the Preferences dialog by clicking *Close*.  
+- **Guake**: Right Click on an open terminal and open *Preferences*. Under *Appearance*
+  tab, uncheck *Use the system fixed width font* (if not already) and select `MesloLGS NF Regular`.
+  Exit the Preferences dialog by clicking *Close*.
+- **MobaXterm**: Open *Settings* → *Configuration* → *Terminal* → (Under *Terminal look and feel*)
+  and change *Font* to `MesloLGS NF`.
+- **WSLtty**: Right click on an open terminal and then on *Options*. In the *Text* section, under
+  *Font*, click *"Select..."* and set Font to `MesloLGS NF Regular`.
 - **Alacritty**: Create or open `~/.config/alacritty/alacritty.yml` and add the following section
   to it:
   ```yaml
@@ -576,6 +582,21 @@ applications on your system. Configure your terminal to use this font:
    font_family MesloLGS NF
    ```
    Restart Kitty by closing all sessions and opening a new session.
+- **WezTerm**: Create or open `$HOME/.config/wezterm/wezterm.lua` and add the following:
+  ```lua
+  local wezterm = require 'wezterm';
+  return {
+      font = wezterm.font("MesloLGS NF"),
+  }
+  ```
+  If the file already exists, only add the line with the font to the existing return. 
+  Also add the first line if it is not already present.
+- **urxvt**: Create or open `~/.Xresources` and add the following line to it:
+   ```text
+   URxvt.font: xft:MesloLGS NF:size=11
+   ```
+  You can adjust the font size to your preference. After changing the configuration use `xrdb ~/.Xresources` to reload the config. 
+  The new config is applied for all new terminals.
 
 **IMPORTANT:** Run `p10k configure` after changing terminal font. The old `~/.p10k.zsh` may work
 incorrectly with the new font.
@@ -923,10 +944,24 @@ computation completes.
 
 When your current directory is within a Git repository, Powerlevel10k computes up-to-date Git
 status after every command. If the repository is large, or the machine is slow, this computation
-can take quite a bit of time. If it takes longer than 20 milliseconds (configurable via
+can take quite a bit of time. If it takes longer than 10 milliseconds (configurable via
 `POWERLEVEL9K_VCS_MAX_SYNC_LATENCY_SECONDS`), Powerlevel10k displays the last known Git status in
 grey and continues to compute up-to-date Git status in the background. When the computation
 completes, Powerlevel10k refreshes prompt with new information, this time with colored Git status.
+
+When using *Rainbow* style, Git status is displayed as black on grey while it's still being
+computed. Depending on the terminal color palette, this may be difficult to read. In this case you
+might want to change the background color to something ligher for more contrast. To do that, open
+`~/.p10k.zsh`, search for `POWERLEVEL9K_VCS_LOADING_BACKGROUND`, uncomment it if it's commented out,
+and change the value.
+
+```zsh
+typeset -g POWERLEVEL9K_VCS_LOADING_BACKGROUND=244
+```
+
+Type `source ~/.p10k.zsh` to apply your changes to the current Zsh session.
+
+*Related*: [How do I change prompt colors?](#how-do-i-change-prompt-colors)
 
 ### How do I add username and/or hostname to prompt?
 
@@ -970,8 +1005,8 @@ a relevant tool.
 
 ```zsh
 # Show prompt segment "kubecontext" only when the command you are typing
-# invokes kubectl, helm, kubens, kubectx, oc, istioctl, kogito, k9s or helmfile.
-typeset -g POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND='kubectl|helm|kubens|kubectx|oc|istioctl|kogito|k9s|helmfile'
+# invokes kubectl, helm, kubens, kubectx, oc, istioctl, kogito, k9s, helmfile, fluxctl or stern.
+typeset -g POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND='kubectl|helm|kubens|kubectx|oc|istioctl|kogito|k9s|helmfile|fluxctl|stern'
 ```
 
 Configs created by `p10k configure` may contain parameters of this kind. To customize when different
@@ -987,7 +1022,7 @@ function kube-toggle() {
   if (( ${+POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND} )); then
     unset POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND
   else
-    POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND='kubectl|helm|kubens|kubectx|oc|istioctl|kogito|k9s|helmfile'
+    POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND='kubectl|helm|kubens|kubectx|oc|istioctl|kogito|k9s|helmfile|fluxctl|stern'
   fi
   p10k reload
   if zle; then
@@ -1439,11 +1474,11 @@ From [Zsh documentation](
   http://zsh.sourceforge.net/Doc/Release/Parameters.html#index-ZLE_005fRPROMPT_005fINDENT):
 
 > `ZLE_RPROMPT_INDENT <S>`
-> 
+>
 > If set, used to give the indentation between the right hand side of the right prompt in the line
 > editor as given by `RPS1` or `RPROMPT` and the right hand side of the screen. If not set, the
 > value `1` is used.
-> 
+>
 > Typically this will be used to set the value to `0` so that the prompt appears flush with the
 > right hand side of the screen.
 

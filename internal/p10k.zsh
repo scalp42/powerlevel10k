@@ -1,4 +1,4 @@
-if [[ $__p9k_sourced != 12 ]]; then
+if [[ $__p9k_sourced != 13 ]]; then
   >&2 print -P ""
   >&2 print -P "[%F{1}ERROR%f]: Corrupted powerlevel10k installation."
   >&2 print -P ""
@@ -300,20 +300,19 @@ function _p9k_upglob() {
 #   _p9k_prompt_length '%F{red}abc' => 3
 #   _p9k_prompt_length $'%{a\b%Gb%}' => 1
 function _p9k_prompt_length() {
-  local COLUMNS=1024
+  local -i COLUMNS=1024
   local -i x y=$#1 m
   if (( y )); then
     while (( ${${(%):-$1%$y(l.1.0)}[-1]} )); do
       x=y
-      (( y *= 2 ));
+      (( y *= 2 ))
     done
-    local xy
     while (( y > x + 1 )); do
-      m=$(( x + (y - x) / 2 ))
-      typeset ${${(%):-$1%$m(l.x.y)}[-1]}=$m
+      (( m = x + (y - x) / 2 ))
+      (( ${${(%):-$1%$m(l.x.y)}[-1]} = m ))
     done
   fi
-  _p9k__ret=$x
+  typeset -g _p9k__ret=$x
 }
 
 typeset -gr __p9k_byte_suffix=('B' 'K' 'M' 'G' 'T' 'P' 'E' 'Z' 'Y')
@@ -735,7 +734,7 @@ _p9k_left_prompt_segment() {
       fi
     fi
 
-    p+="\${_p9k__c::=$content_exp_}"
+    p+='${_p9k__c::='$content_exp_'}${_p9k__c::=${_p9k__c//'$'\r''}}'
     p+='${_p9k__e::=${${_p9k__'${_p9k__line_index}l${${1#prompt_}%%[A-Z_]#}'+00}:-'
     if (( has_icon == -1 )); then
       p+='${${(%):-$_p9k__c%1(l.1.0)}[-1]}${${(%):-$_p9k__v%1(l.1.0)}[-1]}}'
@@ -962,7 +961,7 @@ _p9k_right_prompt_segment() {
       fi
     fi
 
-    p+="\${_p9k__c::=$content_exp_}"
+    p+='${_p9k__c::='$content_exp_'}${_p9k__c::=${_p9k__c//'$'\r''}}'
     p+='${_p9k__e::=${${_p9k__'${_p9k__line_index}r${${1#prompt_}%%[A-Z_]#}'+00}:-'
     if (( has_icon == -1 )); then
       p+='${${(%):-$_p9k__c%1(l.1.0)}[-1]}${${(%):-$_p9k__v%1(l.1.0)}[-1]}}'
@@ -1342,10 +1341,10 @@ _p9k_prompt_battery_set_args() {
         if _p9k_read_file $dir/(power|current)_now(N) && (( $#_p9k__ret < 9 )); then
           (( power_now += ${pow::=$_p9k__ret} ))
         fi
-        if _p9k_read_file $dir/(energy|charge)_now(N); then
-          (( energy_now += _p9k__ret ))
-        elif _p9k_read_file $dir/capacity(N); then
+        if _p9k_read_file $dir/capacity(N); then
           (( energy_now += _p9k__ret * full / 100. + 0.5 ))
+        elif _p9k_read_file $dir/(energy|charge)_now(N); then
+          (( energy_now += _p9k__ret ))
         fi
         _p9k_read_file $dir/status(N) && local bat_status=$_p9k__ret || continue
         [[ $bat_status != Full                                ]] && is_full=0
@@ -1769,9 +1768,12 @@ prompt_dir() {
       fi
     ;;
     truncate_to_last)
-      if [[ $#parts -gt 2 || $p[1] != / && $#parts -gt 1 ]]; then
+      shortenlen=${_POWERLEVEL9K_SHORTEN_DIR_LENGTH:-1}
+      (( shortenlen > 0 )) || shortenlen=1
+      local -i i='shortenlen+1'
+      if [[ $#parts -gt i || $p[1] != / && $#parts -gt shortenlen ]]; then
         fake_first=1
-        parts[1,-2]=()
+        parts[1,-i]=()
       fi
     ;;
     truncate_to_first_and_last)
@@ -1902,8 +1904,12 @@ prompt_dir() {
     ;;
   esac
 
-  [[ $_POWERLEVEL9K_DIR_SHOW_WRITABLE != 0 && ! -w $_p9k__cwd ]]
-  local w=$?
+  # w=0: writable
+  # w=1: not writable
+  # w=2: does not exist
+  (( !_POWERLEVEL9K_DIR_SHOW_WRITABLE )) || [[ -w $_p9k__cwd ]]
+  local -i w=$?
+  (( w && _POWERLEVEL9K_DIR_SHOW_WRITABLE > 2 )) && [[ ! -e $_p9k__cwd ]] && w=2
   if ! _p9k_cache_ephemeral_get $0 $_p9k__cwd $p $w $fake_first "${parts[@]}"; then
     local state=$0
     local icon=''
@@ -1915,9 +1921,11 @@ prompt_dir() {
         break
       fi
     done
-    if (( ! w )); then
+    if (( w )); then
       if (( _POWERLEVEL9K_DIR_SHOW_WRITABLE == 1 )); then
         state=${0}_NOT_WRITABLE
+      elif (( w == 2 )); then
+        state+=_NON_EXISTENT
       else
         state+=_NOT_WRITABLE
       fi
@@ -2231,9 +2239,9 @@ prompt_load() {
   _p9k_read_file /proc/loadavg || return
   local load=${${(A)=_p9k__ret}[_POWERLEVEL9K_LOAD_WHICH]//,/.}
   local -F pct='100. * load / _p9k_num_cpus'
-  if (( pct > 70 )); then
+  if (( pct > _POWERLEVEL9K_LOAD_CRITICAL_PCT )); then
     _p9k_prompt_segment $0_CRITICAL red    "$_p9k_color1" LOAD_ICON 0 '' $load
-  elif (( pct > 50 )); then
+  elif (( pct > _POWERLEVEL9K_LOAD_WARNING_PCT )); then
     _p9k_prompt_segment $0_WARNING  yellow "$_p9k_color1" LOAD_ICON 0 '' $load
   else
     _p9k_prompt_segment $0_NORMAL   green  "$_p9k_color1" LOAD_ICON 0 '' $load
@@ -2266,9 +2274,9 @@ _p9k_prompt_load_async() {
   _p9k__load_warning=
   _p9k__load_critical=
   local -F pct='100. * _p9k__load_value / _p9k_num_cpus'
-  if (( pct > 70 )); then
+  if (( pct > _POWERLEVEL9K_LOAD_CRITICAL_PCT )); then
     _p9k__load_critical=1
-  elif (( pct > 50 )); then
+  elif (( pct > _POWERLEVEL9K_LOAD_WARNING_PCT )); then
     _p9k__load_warning=1
   else
     _p9k__load_normal=1
@@ -2589,7 +2597,13 @@ _p9k_prompt_ram_async() {
       (( free_bytes += match[1] ))
       [[ $stat =~ 'Pages inactive:[[:space:]]+([0-9]+)' ]] || return
       (( free_bytes += match[1] ))
-      (( free_bytes *= 4096 ))
+      if (( ! $+_p9k__ram_pagesize )); then
+        local p
+        (( $+commands[pagesize] )) && p=$(pagesize 2>/dev/null) && [[ $p == <1-> ]] || p=4096
+        typeset -gi _p9k__ram_pagesize=p
+        _p9k_print_params _p9k__ram_pagesize
+      fi
+      (( free_bytes *= _p9k__ram_pagesize ))
     ;;
     BSD)
       local stat && stat="$(grep -F 'avail memory' /var/run/dmesg.boot 2>/dev/null)" || return
@@ -4448,8 +4462,15 @@ prompt_azure() {
     fi
     _p9k_cache_stat_set "$name"
   fi
+  local pat class
+  for pat class in "${_POWERLEVEL9K_AZURE_CLASSES[@]}"; do
+    if [[ $name == ${~pat} ]]; then
+      [[ -n $class ]] && state=_${${(U)class}//İ/I}
+      break
+    fi
+  done
   [[ -n $_p9k__cache_val[1] ]] || return
-  _p9k_prompt_segment "$0" "blue" "white" "AZURE_ICON" 0 '' "${_p9k__cache_val[1]//\%/%%}"
+  _p9k_prompt_segment "$0$state" "blue" "white" "AZURE_ICON" 0 '' "${_p9k__cache_val[1]//\%/%%}"
 }
 
 _p9k_prompt_azure_init() {
@@ -4588,7 +4609,7 @@ typeset -gra __p9k_nordvpn_tag=(
 function _p9k_fetch_nordvpn_status() {
   setopt err_return
   local REPLY
-  zsocket /run/nordvpnd.sock
+  zsocket $1
   local -i fd=$REPLY
   {
     >&$fd echo -nE - $'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n\0\0\0\4\1\0\0\0\0\0\0N\1\4\0\0\0\1\203\206E\221bA\226\223\325\\k\337\31i=LnH\323j?A\223\266\243y\270\303\fYmLT{$\357]R.\203\223\257_\213\35u\320b\r&=LMedz\212\232\312\310\264\307`+\210K\203@\2te\206M\2035\5\261\37\0\0\5\0\1\0\0\0\1\0\0\0\0\0'
@@ -4664,21 +4685,29 @@ function _p9k_fetch_nordvpn_status() {
 #   POWERLEVEL9K_NORDVPN_CONNECTING_BACKGROUND=cyan
 function prompt_nordvpn() {
   unset $__p9k_nordvpn_tag P9K_NORDVPN_COUNTRY_CODE
-  if [[ -e /run/nordvpnd.sock ]]; then
-    _p9k_fetch_nordvpn_status 2>/dev/null
-    if [[ $P9K_NORDVPN_SERVER == (#b)([[:alpha:]]##)[[:digit:]]##.nordvpn.com ]]; then
-      typeset -g P9K_NORDVPN_COUNTRY_CODE=${${(U)match[1]}//İ/I}
-    fi
+  if [[ -e /run/nordvpn/nordvpnd.sock ]]; then
+    sock=/run/nordvpn/nordvpnd.sock
+  elif [[ -e /run/nordvpnd.sock ]]; then
+    sock=/run/nordvpnd.sock
+  else
+    return
+  fi
+  _p9k_fetch_nordvpn_status $sock 2>/dev/null
+  if [[ $P9K_NORDVPN_SERVER == (#b)([[:alpha:]]##)[[:digit:]]##.nordvpn.com ]]; then
+    typeset -g P9K_NORDVPN_COUNTRY_CODE=${${(U)match[1]}//İ/I}
   fi
   case $P9K_NORDVPN_STATUS in
     Connected)
-      _p9k_prompt_segment $0_CONNECTED blue   white NORDVPN_ICON 0 '' "$P9K_NORDVPN_COUNTRY_CODE";;
+      _p9k_prompt_segment $0_CONNECTED blue   white NORDVPN_ICON 0 '' "$P9K_NORDVPN_COUNTRY_CODE"
+    ;;
     Disconnected|Connecting|Disconnecting)
       local state=${${(U)P9K_NORDVPN_STATUS}//İ/I}
       _p9k_get_icon $0_$state FAIL_ICON
-      _p9k_prompt_segment $0_$state    yellow white NORDVPN_ICON 0 '' "$_p9k__ret";;
+      _p9k_prompt_segment $0_$state    yellow white NORDVPN_ICON 0 '' "$_p9k__ret"
+    ;;
     *)
-      _p9k_prompt_segment $0_MISSING   blue   white ''        0 '' '';;
+      return
+    ;;
   esac
 }
 
@@ -5062,7 +5091,7 @@ _p9k_prompt_wifi_async() {
       lines=(${(f)"$(command iw dev $iface link)"}) || return 0
       local -a match mbegin mend
       for line in $lines; do
-        if [[ $line == (#b)[[:space:]]#SSID:[[:space:]]##([^[:space:]]##) ]]; then
+        if [[ $line == (#b)[[:space:]]#SSID:[[:space:]]##(*) ]]; then
           ssid=$match[1]
         elif [[ $line == (#b)[[:space:]]#'tx bitrate:'[[:space:]]##([^[:space:]]##)' MBit/s'* ]]; then
           last_tx_rate=$match[1]
@@ -5840,6 +5869,7 @@ _p9k_dump_instant_prompt() {
     typeset -gi __p9k_instant_prompt_sourced='$__p9k_instant_prompt_version'
     return 1
   fi
+  local _p9k__ipe
   local P9K_PROMPT=instant
   if [[ -z $P9K_TTY || $P9K_TTY == old && -n ${_P9K_TTY:#$TTY} ]]; then'
       if (( _POWERLEVEL9K_NEW_TTY_MAX_AGE_SECONDS < 0 )); then
@@ -6005,20 +6035,19 @@ _p9k_dump_instant_prompt() {
   (( height += ${#${__p9k_used_instant_prompt[1]//[^$lf]}} ))
   local _p9k__ret
   function _p9k_prompt_length() {
-    local COLUMNS=1024
+    local -i COLUMNS=1024
     local -i x y=$#1 m
     if (( y )); then
       while (( ${${(%):-$1%$y(l.1.0)}[-1]} )); do
         x=y
-        (( y *= 2 ));
+        (( y *= 2 ))
       done
-      local xy
       while (( y > x + 1 )); do
-        m=$(( x + (y - x) / 2 ))
-        typeset ${${(%):-$1%$m(l.x.y)}[-1]}=$m
+        (( m = x + (y - x) / 2 ))
+        (( ${${(%):-$1%$m(l.x.y)}[-1]} = m ))
       done
     fi
-    _p9k__ret=$x
+    typeset -g _p9k__ret=$x
   }
   local out
   if [[ $+VTE_VERSION == 0 && $TERM_PROGRAM != Hyper ]] || (( ! $+_p9k__g )); then
@@ -6027,7 +6056,7 @@ _p9k_dump_instant_prompt() {
     local -i fill=$((COLUMNS > _p9k__ret ? COLUMNS - _p9k__ret : 0))
     out+="${(%):-%b%k%f%s%u$mark${(pl.$fill.. .)}$cr%b%k%f%s%u%E}"
   fi
-  out+="${(pl.$height..$lf.)}$esc${height}A$terminfo[sc]"
+  (( _z4h_can_save_restore_screen == 1 )) || out+="${(pl.$height..$lf.)}$esc${height}A$terminfo[sc]"
   out+=${(%):-"$__p9k_used_instant_prompt[1]$__p9k_used_instant_prompt[2]"}
   if [[ -n $__p9k_used_instant_prompt[3] ]]; then
     _p9k_prompt_length "$__p9k_used_instant_prompt[2]"
@@ -6038,6 +6067,7 @@ _p9k_dump_instant_prompt() {
       out+="${(pl.$gap.. .)}${(%):-${__p9k_used_instant_prompt[3]}%b%k%f%s%u}$cr$esc${left_len}C"
     fi
   fi
+  (( _z4h_can_save_restore_screen == 1 )) && out+="$cr$esc${height}A$terminfo[sc]$out"
   typeset -g __p9k_instant_prompt_output=${TMPDIR:-/tmp}/p10k-instant-prompt-output-${(%):-%n}-$$
   { echo -n > $__p9k_instant_prompt_output } || return
   print -rn -- "$out" || return
@@ -7069,6 +7099,7 @@ _p9k_init_params() {
   case $_POWERLEVEL9K_DIR_SHOW_WRITABLE in
     true) _POWERLEVEL9K_DIR_SHOW_WRITABLE=1;;
     v2)   _POWERLEVEL9K_DIR_SHOW_WRITABLE=2;;
+    v3)   _POWERLEVEL9K_DIR_SHOW_WRITABLE=3;;
     *)    _POWERLEVEL9K_DIR_SHOW_WRITABLE=0;;
   esac
   typeset -gi _POWERLEVEL9K_DIR_SHOW_WRITABLE
@@ -7152,7 +7183,7 @@ _p9k_init_params() {
   _p9k_declare -s POWERLEVEL9K_IP_INTERFACE ""
   : ${_POWERLEVEL9K_IP_INTERFACE:='.*'}
   _p9k_segment_in_use ip || _POWERLEVEL9K_IP_INTERFACE=
-  _p9k_declare -s POWERLEVEL9K_VPN_IP_INTERFACE "(gpd|wg|(.*tun))[0-9]*"
+  _p9k_declare -s POWERLEVEL9K_VPN_IP_INTERFACE "(gpd|wg|(.*tun)|tailscale)[0-9]*"
   : ${_POWERLEVEL9K_VPN_IP_INTERFACE:='.*'}
   _p9k_segment_in_use vpn_ip || _POWERLEVEL9K_VPN_IP_INTERFACE=
   _p9k_declare -b POWERLEVEL9K_VPN_IP_SHOW_ALL 0
@@ -7162,6 +7193,8 @@ _p9k_init_params() {
     15) _POWERLEVEL9K_LOAD_WHICH=3;;
     *) _POWERLEVEL9K_LOAD_WHICH=2;;
   esac
+  _p9k_declare -F POWERLEVEL9K_LOAD_WARNING_PCT 50
+  _p9k_declare -F POWERLEVEL9K_LOAD_CRITICAL_PCT 70
   _p9k_declare -b POWERLEVEL9K_NODE_VERSION_PROJECT_ONLY 0
   _p9k_declare -b POWERLEVEL9K_PHP_VERSION_PROJECT_ONLY 0
   _p9k_declare -b POWERLEVEL9K_DOTNET_VERSION_PROJECT_ONLY 1
@@ -7291,6 +7324,7 @@ _p9k_init_params() {
   #   POWERLEVEL9K_KUBECONTEXT_OTHER_BACKGROUND=yellow
   _p9k_declare -a POWERLEVEL9K_KUBECONTEXT_CLASSES --
   _p9k_declare -a POWERLEVEL9K_AWS_CLASSES --
+  _p9k_declare -a POWERLEVEL9K_AZURE_CLASSES --
   _p9k_declare -a POWERLEVEL9K_TERRAFORM_CLASSES --
   _p9k_declare -b POWERLEVEL9K_TERRAFORM_SHOW_DEFAULT 0
   _p9k_declare -a POWERLEVEL9K_GOOGLE_APP_CRED_CLASSES -- 'service_account:*' SERVICE_ACCOUNT
@@ -7563,9 +7597,15 @@ function _p9k_wrap_widgets() {
     if (( ! $+functions[_p9k_widget_$widget] )); then
       functions[_p9k_widget_$widget]='_p9k_widget '${(q)widget}' "$@"'
     fi
-    # The leading dot is to work around bugs in zsh-syntax-highlighting.
-    zle -A $widget ._p9k_orig_$widget
-    zle -N $widget _p9k_widget_$widget
+    if [[ $widget == zle-* &&
+          $widgets[$widget] == user:azhw:* &&
+          $functions[add-zle-hook-widget] ]]; then
+      add-zle-hook-widget $widget _p9k_widget_$widget
+    else
+      # The leading dot is to work around bugs in zsh-syntax-highlighting.
+      zle -A $widget ._p9k_orig_$widget
+      zle -N $widget _p9k_widget_$widget
+    fi
   done 2>/dev/null  # `zle -A` fails for inexisting widgets and complains to stderr
 }
 
@@ -7841,8 +7881,13 @@ _p9k_init_prompt() {
   fi
 
   if [[ $ITERM_SHELL_INTEGRATION_INSTALLED == Yes ]]; then
-    _p9k_prompt_prefix_left+=$'%{\e]133;A\a%}'
-    _p9k_prompt_suffix_left+=$'%{\e]133;B\a%}'
+    if (( $+_z4h_iterm_cmd && _z4h_can_save_restore_screen == 1 )); then
+      _p9k_prompt_prefix_left+=$'%{\ePtmux;\e\e]133;A\a\e\\%}'
+      _p9k_prompt_suffix_left+=$'%{\ePtmux;\e\e]133;B\a\e\\%}'
+    else
+      _p9k_prompt_prefix_left+=$'%{\e]133;A\a%}'
+      _p9k_prompt_suffix_left+=$'%{\e]133;B\a%}'
+    fi
   fi
 
   if (( _POWERLEVEL9K_PROMPT_ADD_NEWLINE_COUNT > 0 )); then
@@ -7855,6 +7900,23 @@ _p9k_init_prompt() {
     _p9k_prompt_prefix_left+='${_p9k_t[${_p9k__empty_line_i:-'$#_p9k_t'}-1]}'
   else
     _p9k_prompt_prefix_left+='${_p9k_t[${_p9k__empty_line_i:-'$#_p9k_t'}]}'
+  fi
+
+  local -i num_lines=$#_p9k_line_segments_left
+  if (( $+terminfo[cuu1] )); then
+    _p9k_escape $terminfo[cuu1]
+    if (( __p9k_ksh_arrays )); then
+      local scroll=$'${_p9k_t[${_p9k__ruler_i:-1}-1]:+\n'$_p9k__ret'}'
+    else
+      local scroll=$'${_p9k_t[${_p9k__ruler_i:-1}]:+\n'$_p9k__ret'}'
+    fi
+    if (( num_lines > 1 )); then
+      local -i line_index=
+      for line_index in {1..$((num_lines-1))}; do
+        scroll='${_p9k__'$line_index-$'\n}'$scroll'${_p9k__'$line_index-$_p9k__ret'}'
+      done
+    fi
+    _p9k_prompt_prefix_left+='%{${_p9k__ipe-'$scroll'}%}'
   fi
 
   _p9k_get_icon '' RULER_CHAR
@@ -7933,7 +7995,7 @@ _p9k_must_init() {
     [[ $sig == $_p9k__param_sig ]] && return 1
     _p9k_deinit
   fi
-  _p9k__param_pat=$'v109\1'${(q)ZSH_VERSION}$'\1'${(q)ZSH_PATCHLEVEL}$'\1'
+  _p9k__param_pat=$'v116\1'${(q)ZSH_VERSION}$'\1'${(q)ZSH_PATCHLEVEL}$'\1'
   _p9k__param_pat+=$'${#parameters[(I)POWERLEVEL9K_*]}\1${(%):-%n%#}\1$GITSTATUS_LOG_LEVEL\1'
   _p9k__param_pat+=$'$GITSTATUS_ENABLE_LOGGING\1$GITSTATUS_DAEMON\1$GITSTATUS_NUM_THREADS\1'
   _p9k__param_pat+=$'$GITSTATUS_CACHE_DIR\1$GITSTATUS_AUTO_INSTALL\1${ZLE_RPROMPT_INDENT:-1}\1'
@@ -7942,7 +8004,8 @@ _p9k_must_init() {
   _p9k__param_pat+=$'${(M)VTE_VERSION:#(<1-4602>|4801)}\1$DEFAULT_USER\1$P9K_SSH\1$+commands[uname]\1'
   _p9k__param_pat+=$'$__p9k_root_dir\1$functions[p10k-on-init]\1$functions[p10k-on-pre-prompt]\1'
   _p9k__param_pat+=$'$functions[p10k-on-post-widget]\1$functions[p10k-on-post-prompt]\1'
-  _p9k__param_pat+=$'$+commands[git]\1$terminfo[colors]'
+  _p9k__param_pat+=$'$+commands[git]\1$terminfo[colors]\1${+_z4h_iterm_cmd}\1'
+  _p9k__param_pat+=$'$_z4h_can_save_restore_screen'
   local MATCH
   IFS=$'\1' _p9k__param_pat+="${(@)${(@o)parameters[(I)POWERLEVEL9K_*]}:/(#m)*/\${${(q)MATCH}-$IFS\}}"
   IFS=$'\2' _p9k__param_sig="${(e)_p9k__param_pat}"
@@ -8006,7 +8069,11 @@ function _p9k_init_cacheable() {
     _p9k_transient_prompt+='${:-"'$_p9k__ret'"}'
     _p9k_transient_prompt+=')%b%k%f%s%u '
     if [[ $ITERM_SHELL_INTEGRATION_INSTALLED == Yes ]]; then
-      _p9k_transient_prompt=$'%{\e]133;A\a%}'$_p9k_transient_prompt$'%{\e]133;B\a%}'
+      if (( $+_z4h_iterm_cmd && _z4h_can_save_restore_screen == 1 )); then
+        _p9k_transient_prompt=$'%{\ePtmux;\e\e]133;A\a\e\\%}'$_p9k_transient_prompt$'%{\ePtmux;\e\e]133;B\a\e\\%}'
+      else
+        _p9k_transient_prompt=$'%{\e]133;A\a%}'$_p9k_transient_prompt$'%{\e]133;B\a%}'
+      fi
     fi
   fi
 
@@ -8020,7 +8087,7 @@ function _p9k_init_cacheable() {
     case $_p9k_uname in
       SunOS)                     _p9k_set_os Solaris SUNOS_ICON;;
       Darwin)                    _p9k_set_os OSX     APPLE_ICON;;
-      CYGWIN_NT-* | MSYS_NT-*)   _p9k_set_os Windows WINDOWS_ICON;;
+      CYGWIN*|MSYS*|MINGW*)      _p9k_set_os Windows WINDOWS_ICON;;
       FreeBSD|OpenBSD|DragonFly) _p9k_set_os BSD     FREEBSD_ICON;;
       Linux)
         _p9k_os='Linux'

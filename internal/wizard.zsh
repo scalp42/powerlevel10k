@@ -110,20 +110,19 @@ local -ra rainbow_right=(
 )
 
 function prompt_length() {
-  local COLUMNS=1024
+  local -i COLUMNS=1024
   local -i x y=$#1 m
   if (( y )); then
     while (( ${${(%):-$1%$y(l.1.0)}[-1]} )); do
       x=y
-      (( y *= 2 ));
+      (( y *= 2 ))
     done
-    local xy
     while (( y > x + 1 )); do
-      m=$(( x + (y - x) / 2 ))
-      typeset ${${(%):-$1%$m(l.x.y)}[-1]}=$m
+      (( m = x + (y - x) / 2 ))
+      (( ${${(%):-$1%$m(l.x.y)}[-1]} = m ))
     done
   fi
-  REPLY=$x
+  typeset -g REPLY=$x
 }
 
 function print_prompt() {
@@ -407,6 +406,7 @@ function ask() {
     fi
     typeset -g choice=
     if read -t1 -k choice; then
+      choice=${(L)choice}
       if [[ $choice == q ]]; then
         quit
       fi
@@ -564,14 +564,25 @@ function install_font() {
       print
       flowing +c "%2FMeslo Nerd Font%f" successfully installed.
       print -P ""
-      flowing +c Please "%Brestart iTerm2%b" for the changes to take effect.
-      print -P ""
-      flowing +c -i 5 "  1. Click" "%BiTerm2 → Quit iTerm2%b" or press "%B⌘ Q%b."
-      flowing +c -i 5 "  2. Open %BiTerm2%b."
-      print -P ""
-      flowing +c "It's" important to "%Brestart iTerm2%b" by following the instructions above.   \
-                 "It's" "%Bnot enough%b" to close iTerm2 by clicking on the red circle. You must \
-                 click "%BiTerm2 → Quit iTerm2%b" or press "%B⌘ Q%b."
+      () {
+        local out
+        out=$(/usr/bin/defaults read 'Apple Global Domain' NSQuitAlwaysKeepsWindows 2>/dev/null) || return
+        [[ $out == 1 ]] || return
+        out="$(iterm_get OpenNoWindowsAtStartup 2>/dev/null)" || return
+        [[ $out == false ]]
+      }
+      if (( $? )); then
+        flowing +c Please "%Brestart iTerm2%b" for the changes to take effect.
+        print -P ""
+        flowing +c -i 5 "  1. Click" "%BiTerm2 → Quit iTerm2%b" or press "%B⌘ Q%b."
+        flowing +c -i 5 "  2. Open %BiTerm2%b."
+        print -P ""
+        flowing +c "It's" important to "%Brestart iTerm2%b" by following the instructions above.   \
+                   "It's" "%Bnot enough%b" to close iTerm2 by clicking on the red circle. You must \
+                   click "%BiTerm2 → Quit iTerm2%b" or press "%B⌘ Q%b."
+      else
+        flowing +c Please "%Brestart your computer%b" for the changes to take effect.
+      fi
       while true; do sleep 60 2>/dev/null; done
     ;;
   esac
@@ -1059,7 +1070,7 @@ function os_icon_name() {
     case $uname in
       SunOS)                     echo SUNOS_ICON;;
       Darwin)                    echo APPLE_ICON;;
-      CYGWIN_NT-* | MSYS_NT-*)   echo WINDOWS_ICON;;
+      CYGWIN_NT-*|MSYS_NT-*|MINGW64_NT-*|MINGW32_NT-*)   echo WINDOWS_ICON;;
       FreeBSD|OpenBSD|DragonFly) echo FREEBSD_ICON;;
       Linux)
         local os_release_id
